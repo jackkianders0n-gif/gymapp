@@ -329,9 +329,10 @@ function AddExerciseSheet({ onAdd, onClose, existingNames }) {
 
 // ─── Log Workout ───
 function LogWorkout({ exercises, onSave, onCancel, prefill }) {
+  const [name, setName] = useState(prefill?.name || "");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState(() => {
-    if (prefill) return prefill.exercises.map(ex => ({ name: ex.name, sets: ex.sets.map(s => ({ reps: String(s.reps), kg: String(s.kg) })) }));
+    if (prefill) return prefill.exercises.map(ex => ({ name: ex.name, exerciseId: ex.exerciseId, sets: ex.sets.map(s => ({ reps: String(s.reps), kg: String(s.kg) })) }));
     return [];
   });
 
@@ -345,7 +346,7 @@ function LogWorkout({ exercises, onSave, onCancel, prefill }) {
     if (ex.pbs.length === 1) seedSets = [{ reps: String(ex.pbs[0].reps), kg: String(ex.pbs[0].kg) }];
     else if (ex.pbs.length === 0) seedSets = [{ reps: "", kg: "" }];
     else seedSets = [];
-    setItems(prev => [...prev, { name: ex.name, sets: seedSets }]);
+    setItems(prev => [...prev, { name: ex.name, exerciseId: ex.id, sets: seedSets }]);
     setSearch("");
   };
   const chooseRep = (ei, pb) => setItems(prev => prev.map((e, i) => i === ei ? { ...e, sets: [{ reps: String(pb.reps), kg: String(pb.kg) }] } : e));
@@ -368,8 +369,11 @@ function LogWorkout({ exercises, onSave, onCancel, prefill }) {
         <button onClick={onCancel} style={{ background: "none", border: "1px solid #2a2a2e", borderRadius: 6, padding: "5px 12px", color: "#888", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
       </div>
 
+      <input type="text" placeholder="Workout name (optional), e.g. Push Day" value={name} onChange={e => setName(e.target.value)}
+        style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: 12 }} />
+
       {items.map((ex, ei) => {
-        const exData = exercises.find(e => e.name === ex.name);
+        const exData = exercises.find(e => e.id === ex.exerciseId) || exercises.find(e => e.name === ex.name);
         const col = exData ? AREA_COLORS[exData.area] : "#888";
         return (
           <div key={ex.name} style={{ background: "#1a1a1e", borderRadius: 10, borderLeft: `3px solid ${col}`, marginBottom: 8, padding: "12px 14px" }}>
@@ -434,7 +438,7 @@ function LogWorkout({ exercises, onSave, onCancel, prefill }) {
         </div>
       )}
       <button onClick={() => {
-        const workout = { id: uid(), date: new Date().toISOString(), exercises: items.map(ex => ({ name: ex.name, sets: ex.sets.filter(s => s.reps && s.kg).map(s => ({ reps: Number(s.reps), kg: Number(s.kg) })) })).filter(ex => ex.sets.length > 0) };
+        const workout = { id: uid(), date: new Date().toISOString(), name: name.trim() || null, exercises: items.map(ex => ({ name: ex.name, exerciseId: ex.exerciseId, sets: ex.sets.filter(s => s.reps && s.kg).map(s => ({ reps: Number(s.reps), kg: Number(s.kg) })) })).filter(ex => ex.sets.length > 0) };
         onSave(workout);
       }} disabled={!canSave}
         style={{ width: "100%", background: canSave ? "#3A9BE8" : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit", marginTop: 8 }}>
@@ -472,8 +476,8 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onDeleteWorkout }) {
             {recent4.map((w, i) => (
               <button key={w.id} onClick={() => { setPrefill(w); setLogging(true); }}
                 style={{ background: "#1a1a1e", border: "1px solid #2a2a2e", borderRadius: 8, padding: "8px 12px", cursor: "pointer", flexShrink: 0, textAlign: "left", minWidth: 110 }}>
-                <div style={{ color: "#ccc", fontSize: 12, fontWeight: 500 }}>{fmt(w.date)}</div>
-                <div style={{ color: "#666", fontSize: 10, marginTop: 2 }}>{w.exercises.length} exercises</div>
+                <div style={{ color: "#ccc", fontSize: 12, fontWeight: 500 }}>{w.name || fmt(w.date)}</div>
+                <div style={{ color: "#666", fontSize: 10, marginTop: 2 }}>{w.name ? fmt(w.date) : `${w.exercises.length} exercises`}</div>
               </button>
             ))}
           </div>
@@ -487,8 +491,8 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onDeleteWorkout }) {
           <button onClick={() => setOpenId(openId === w.id ? null : w.id)}
             style={{ width: "100%", background: "none", border: "none", padding: "12px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ color: "#eee", fontSize: 14, fontWeight: 600 }}>{fmt(w.date)}</div>
-              <div style={{ color: "#666", fontSize: 11 }}>{w.exercises.map(e => e.name).join(", ").slice(0, 50)}{w.exercises.map(e => e.name).join(", ").length > 50 ? "…" : ""}</div>
+              <div style={{ color: "#eee", fontSize: 14, fontWeight: 600 }}>{w.name || fmt(w.date)}</div>
+              <div style={{ color: "#666", fontSize: 11 }}>{w.name ? `${fmt(w.date)} · ` : ""}{w.exercises.map(e => e.name).join(", ").slice(0, 50)}{w.exercises.map(e => e.name).join(", ").length > 50 ? "…" : ""}</div>
             </div>
             <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
               <div style={{ color: "#888", fontSize: 12 }}>{ago(w.date)}</div>
@@ -498,7 +502,7 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onDeleteWorkout }) {
           {openId === w.id && (
             <div style={{ padding: "0 14px 14px" }}>
               {w.exercises.map((ex, i) => {
-                const exData = exercises.find(e => e.name === ex.name);
+                const exData = exercises.find(e => e.id === ex.exerciseId) || exercises.find(e => e.name === ex.name);
                 return (
                   <div key={i} style={{ background: "#111", borderRadius: 6, padding: "8px 10px", marginBottom: 4 }}>
                     <div style={{ color: "#ccc", fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{ex.name}</div>
@@ -538,7 +542,7 @@ function ProgressTab({ exercises, workouts }) {
     const twoMonthsAgo = new Date(); twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
     const repMap = {};
     workouts.filter(w => new Date(w.date) >= twoMonthsAgo).sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(w => {
-      const wex = w.exercises.find(e => e.name === ex.name);
+      const wex = w.exercises.find(e => e.exerciseId === ex.id) || w.exercises.find(e => e.name === ex.name);
       if (!wex) return;
       wex.sets.forEach(s => {
         if (!repMap[s.reps]) repMap[s.reps] = [];
@@ -658,6 +662,34 @@ function Celebration({ pbs, onDone }) {
   );
 }
 
+// Recompute an exercise's PBs after a workout is deleted — only lowers a PB when
+// remaining workout history no longer justifies it. If no remaining workout says
+// anything about that rep count, the PB is left untouched (it may be a manually
+// entered baseline with no workout backing it at all).
+function recomputePBsAfterDelete(exercises, remainingWorkouts, deletedWorkout) {
+  return exercises.map(ex => {
+    const matches = wex => wex.exerciseId === ex.id || wex.name === ex.name;
+    const deletedWex = deletedWorkout.exercises.find(matches);
+    if (!deletedWex) return ex;
+    let pbs = ex.pbs;
+    const repsAffected = new Set(deletedWex.sets.map(s => s.reps));
+    repsAffected.forEach(reps => {
+      const pbIdx = pbs.findIndex(p => p.reps === reps);
+      if (pbIdx === -1) return;
+      let best = null;
+      remainingWorkouts.forEach(w => {
+        w.exercises.filter(matches).forEach(wex => {
+          wex.sets.forEach(s => { if (s.reps === reps && (best === null || s.kg > best)) best = s.kg; });
+        });
+      });
+      if (best !== null && best < pbs[pbIdx].kg) {
+        pbs = pbs.map((p, i) => i === pbIdx ? { ...p, kg: best } : p);
+      }
+    });
+    return pbs === ex.pbs ? ex : { ...ex, pbs };
+  });
+}
+
 // ─── App ───
 const TABS = ["PBs", "Workouts", "Progress"];
 
@@ -749,7 +781,7 @@ function MainApp({ onSignOut }) {
     setExercises(prev => {
       const updated = prev.map(e => ({ ...e, pbs: [...e.pbs] }));
       w.exercises.forEach(wex => {
-        const idx = updated.findIndex(e => e.name === wex.name);
+        const idx = updated.findIndex(e => e.id === wex.exerciseId || e.name === wex.name);
         if (idx === -1) return;
         // For each rep count, only the best set of the session counts
         const bestByReps = {};
@@ -773,7 +805,14 @@ function MainApp({ onSignOut }) {
     if (beaten.length) setCelebration(beaten);
   }, []);
 
-  const handleDeleteWorkout = useCallback(id => setWorkouts(prev => prev.filter(w => w.id !== id)), []);
+  const handleDeleteWorkout = useCallback(id => {
+    setWorkouts(prev => {
+      const deleted = prev.find(w => w.id === id);
+      const remaining = prev.filter(w => w.id !== id);
+      if (deleted) setExercises(prevEx => recomputePBsAfterDelete(prevEx, remaining, deleted));
+      return remaining;
+    });
+  }, []);
 
   if (!loaded) return <div style={{ background: "#0e0e10", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ color: "#555", fontSize: 14 }}>Loading...</div></div>;
 
@@ -796,9 +835,15 @@ function MainApp({ onSignOut }) {
         {TABS.map(t => <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: "none", border: "none", borderBottom: tab === t ? "2px solid #eee" : "2px solid transparent", padding: "8px 0 10px", color: tab === t ? "#eee" : "#555", fontSize: 13, fontWeight: tab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{t}</button>)}
       </div>
       <div style={{ padding: "14px 16px 100px" }}>
-        {tab === "PBs" && <PBTab exercises={exercises} onUpdate={handleUpdate} onDelete={handleDelete} />}
-        {tab === "Workouts" && <WorkoutsTab exercises={exercises} workouts={workouts} onSaveWorkout={handleSaveWorkout} onDeleteWorkout={handleDeleteWorkout} />}
-        {tab === "Progress" && <ProgressTab exercises={exercises} workouts={workouts} />}
+        <div style={{ display: tab === "PBs" ? "block" : "none" }}>
+          <PBTab exercises={exercises} onUpdate={handleUpdate} onDelete={handleDelete} />
+        </div>
+        <div style={{ display: tab === "Workouts" ? "block" : "none" }}>
+          <WorkoutsTab exercises={exercises} workouts={workouts} onSaveWorkout={handleSaveWorkout} onDeleteWorkout={handleDeleteWorkout} />
+        </div>
+        <div style={{ display: tab === "Progress" ? "block" : "none" }}>
+          <ProgressTab exercises={exercises} workouts={workouts} />
+        </div>
       </div>
       {showAdd && <AddExerciseSheet onAdd={handleAdd} onClose={() => setShowAdd(false)} existingNames={exercises.map(e => e.name)} />}
       {celebration && <Celebration pbs={celebration} onDone={() => setCelebration(null)} />}
