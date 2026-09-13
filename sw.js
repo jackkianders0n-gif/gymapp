@@ -1,5 +1,5 @@
 // PB Tracker service worker — offline app shell
-const CACHE = "pbtracker-v4";
+const CACHE = "pbtracker-v5";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

@@ -31,7 +31,24 @@
 <div id="root"><div id="boot">Loading PB Tracker…</div></div>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      // Re-check for a new version every time the app is opened or resumed —
+      // iOS often resumes the same suspended page instead of reloading it, so
+      // the browser's own update-on-load check alone doesn't catch that case.
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") reg.update().catch(function(){});
+      });
+    }).catch(function(){});
+  });
+  // Once a new service worker takes over, reload once so the page picks up
+  // the matching fresh assets instead of running old JS against a new cache.
+  var refreshedOnce = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    if (refreshedOnce) return;
+    refreshedOnce = true;
+    window.location.reload();
+  });
 }
 </script>
 <script type="text/babel" data-presets="react">
