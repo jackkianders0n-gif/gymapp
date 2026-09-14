@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>PB Tracker</title>
+<title>Gym Tracker</title>
 <meta name="theme-color" content="#0e0e10">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="PB Tracker">
+<meta name="apple-mobile-web-app-title" content="Gym Tracker">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,7 +28,7 @@
 <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
 </head>
 <body>
-<div id="root"><div id="boot">Loading PB Tracker…</div></div>
+<div id="root"><div id="boot">Loading Gym Tracker…</div></div>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
@@ -102,10 +102,11 @@ const INIT_EXERCISES = [
   { id: "ex32", name: "Single Arm Row", area: "Back", muscle: "Upper Back", pbs: [{ reps: 8, kg: 30 }, { reps: 6, kg: 32.5 }] },
   { id: "ex33", name: "Trap Bar Deadlift", area: "Legs", muscle: "Hamstrings", pbs: [{ reps: 8, kg: 104 }, { reps: 6, kg: 114 }] },
   { id: "ex34", name: "Zercher Squat", area: "Legs", muscle: "Quads", pbs: [{ reps: 6, kg: 45 }] },
+  { id: "ex35", name: "Weight Crunches", area: "Abs", muscle: "Abs", pbs: [{ reps: 12, kg: 10 }] },
 ];
 
-const AREA_COLORS = { Legs: "#E8B931", Chest: "#E85D3A", Back: "#3A9BE8", Arms: "#B44AE8", Shoulders: "#3AE89B" };
-const AREA_MUSCLES = { Legs: ["Quads", "Hamstrings", "Glutes"], Chest: ["Chest"], Back: ["Lats", "Upper Back"], Arms: ["Biceps", "Triceps"], Shoulders: ["Delts"] };
+const AREA_COLORS = { Legs: "#E8B931", Chest: "#E85D3A", Back: "#3A9BE8", Arms: "#B44AE8", Shoulders: "#3AE89B", Abs: "#E84A8A" };
+const AREA_MUSCLES = { Legs: ["Quads", "Hamstrings", "Glutes"], Chest: ["Chest"], Back: ["Lats", "Upper Back"], Arms: ["Biceps", "Triceps"], Shoulders: ["Delts"], Abs: ["Abs"] };
 const AREAS = Object.keys(AREA_MUSCLES);
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -345,7 +346,7 @@ function AddExerciseSheet({ onAdd, onClose, existingNames }) {
 }
 
 // ─── Log Workout ───
-function LogWorkout({ exercises, onSave, onCancel, prefill }) {
+function LogWorkout({ exercises, onSave, onCancel, prefill, editMode }) {
   const [name, setName] = useState(prefill?.name || "");
   const [search, setSearch] = useState("");
   const [items, setItems] = useState(() => {
@@ -382,7 +383,7 @@ function LogWorkout({ exercises, onSave, onCancel, prefill }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <span style={{ color: "#eee", fontSize: 16, fontWeight: 600 }}>{prefill ? "Repeat workout" : "Log workout"}</span>
+        <span style={{ color: "#eee", fontSize: 16, fontWeight: 600 }}>{editMode ? "Edit workout" : prefill ? "Repeat workout" : "Log workout"}</span>
         <button onClick={onCancel} style={{ background: "none", border: "1px solid #2a2a2e", borderRadius: 6, padding: "5px 12px", color: "#888", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
       </div>
 
@@ -459,24 +460,29 @@ function LogWorkout({ exercises, onSave, onCancel, prefill }) {
         onSave(workout);
       }} disabled={!canSave}
         style={{ width: "100%", background: canSave ? "#3A9BE8" : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit", marginTop: 8 }}>
-        Save workout
+        {editMode ? "Save changes" : "Save workout"}
       </button>
     </div>
   );
 }
 
 // ─── Workouts Tab ───
-function WorkoutsTab({ exercises, workouts, onSaveWorkout, onDeleteWorkout }) {
+function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDeleteWorkout }) {
   const [logging, setLogging] = useState(false);
   const [prefill, setPrefill] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [openId, setOpenId] = useState(null);
 
   const fmt = d => new Date(d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const ago = d => { const days = Math.floor((new Date() - new Date(d)) / 86400000); if (days === 0) return "Today"; if (days === 1) return "Yesterday"; return `${days}d ago`; };
   const recent4 = workouts.slice(0, 4);
 
+  const closeLog = () => { setLogging(false); setPrefill(null); setEditingId(null); };
+
   if (logging) {
-    return <LogWorkout exercises={exercises} prefill={prefill} onSave={w => { onSaveWorkout(w); setLogging(false); setPrefill(null); }} onCancel={() => { setLogging(false); setPrefill(null); }} />;
+    return <LogWorkout exercises={exercises} prefill={prefill} editMode={!!editingId}
+      onSave={w => { if (editingId) onEditWorkout(editingId, { name: w.name, exercises: w.exercises }); else onSaveWorkout(w); closeLog(); }}
+      onCancel={closeLog} />;
   }
 
   return (
@@ -533,10 +539,16 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onDeleteWorkout }) {
                   </div>
                 );
               })}
-              <button onClick={() => onDeleteWorkout(w.id)}
-                style={{ background: "#1c1215", border: "1px solid #3a1a1a", borderRadius: 6, padding: "7px", color: "#c44", fontSize: 12, cursor: "pointer", fontFamily: "inherit", width: "100%", marginTop: 6 }}>
-                Delete workout
-              </button>
+              <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                <button onClick={() => { setPrefill(w); setEditingId(w.id); setLogging(true); }}
+                  style={{ flex: 1, background: "#131518", border: "1px solid #252830", borderRadius: 6, padding: "7px", color: "#8af", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                  Edit workout
+                </button>
+                <button onClick={() => onDeleteWorkout(w.id)}
+                  style={{ flex: 1, background: "#1c1215", border: "1px solid #3a1a1a", borderRadius: 6, padding: "7px", color: "#c44", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                  Delete workout
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -831,13 +843,53 @@ function MainApp({ onSignOut }) {
     });
   }, []);
 
+  const handleEditWorkout = useCallback((id, changes) => {
+    setWorkouts(prev => {
+      const old = prev.find(w => w.id === id);
+      if (!old) return prev;
+      const updatedWorkout = { ...old, ...changes };
+      const remaining = prev.filter(w => w.id !== id);
+
+      setExercises(prevEx => {
+        // First undo the old version's effect on PBs, same as a delete...
+        const afterRemoval = recomputePBsAfterDelete(prevEx, remaining, old);
+        // ...then reapply as if the edited version was just logged, tracking any new PBs.
+        const updated = afterRemoval.map(e => ({ ...e, pbs: [...e.pbs] }));
+        const beaten = [];
+        updatedWorkout.exercises.forEach(wex => {
+          const idx = updated.findIndex(e => e.id === wex.exerciseId || e.name === wex.name);
+          if (idx === -1) return;
+          const bestByReps = {};
+          wex.sets.forEach(s => { if (!bestByReps[s.reps] || s.kg > bestByReps[s.reps]) bestByReps[s.reps] = s.kg; });
+          Object.entries(bestByReps).forEach(([reps, kg]) => {
+            reps = Number(reps);
+            const pbIdx = updated[idx].pbs.findIndex(p => p.reps === reps);
+            if (pbIdx >= 0) {
+              if (kg > updated[idx].pbs[pbIdx].kg) {
+                beaten.push({ name: wex.name, reps, kg, prev: `${updated[idx].pbs[pbIdx].kg}kg` });
+                updated[idx].pbs[pbIdx] = { ...updated[idx].pbs[pbIdx], kg };
+              }
+            } else {
+              beaten.push({ name: wex.name, reps, kg, prev: null });
+              updated[idx].pbs.push({ reps, kg });
+            }
+          });
+        });
+        if (beaten.length) setCelebration(beaten);
+        return updated;
+      });
+
+      return prev.map(w => w.id === id ? updatedWorkout : w);
+    });
+  }, []);
+
   if (!loaded) return <div style={{ background: "#0e0e10", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ color: "#555", fontSize: 14 }}>Loading...</div></div>;
 
   return (
     <div style={{ background: "#0e0e10", minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 480, margin: "0 auto" }}>
       <div style={{ padding: "16px 16px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h1 style={{ color: "#f0f0f0", fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.03em" }}>PB Tracker</h1>
+          <h1 style={{ color: "#f0f0f0", fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.03em" }}>Gym Tracker</h1>
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3 }}>
             <span style={{ width: 6, height: 6, borderRadius: 3, background: syncMeta.color }} />
             <span style={{ color: syncMeta.color, fontSize: 10 }}>{syncMeta.label}</span>
@@ -856,7 +908,7 @@ function MainApp({ onSignOut }) {
           <PBTab exercises={exercises} onUpdate={handleUpdate} onDelete={handleDelete} />
         </div>
         <div style={{ display: tab === "Workouts" ? "block" : "none" }}>
-          <WorkoutsTab exercises={exercises} workouts={workouts} onSaveWorkout={handleSaveWorkout} onDeleteWorkout={handleDeleteWorkout} />
+          <WorkoutsTab exercises={exercises} workouts={workouts} onSaveWorkout={handleSaveWorkout} onEditWorkout={handleEditWorkout} onDeleteWorkout={handleDeleteWorkout} />
         </div>
         <div style={{ display: tab === "Progress" ? "block" : "none" }}>
           <ProgressTab exercises={exercises} workouts={workouts} />
@@ -900,7 +952,7 @@ function AuthGate({ onAuth }) {
     <div style={{ background: "#0e0e10", minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 24px" }}>
       <div style={{ textAlign: "center", marginBottom: 28 }}>
         <div style={{ fontSize: 40, marginBottom: 10 }}>🏋️</div>
-        <h1 style={{ color: "#f0f0f0", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.03em" }}>PB Tracker</h1>
+        <h1 style={{ color: "#f0f0f0", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.03em" }}>Gym Tracker</h1>
         <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>{mode === "signup" ? "Create your account" : "Sign in to your history"}</div>
       </div>
       <input type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)}

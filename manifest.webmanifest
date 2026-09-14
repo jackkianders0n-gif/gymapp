@@ -1,6 +1,6 @@
 {
-  "name": "PB Tracker",
-  "short_name": "PB Tracker",
+  "name": "Gym Tracker",
+  "short_name": "Gym Tracker",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0e0e10",
