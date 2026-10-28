@@ -1,9 +1,10 @@
 // Gym Tracker service worker — offline app shell
-const CACHE = "gymtracker-v3";
+const CACHE = "gymtracker-v4"; // keep in step with APP_VERSION in index.html
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()).catch(() => {}));
+  // cache: "reload" so a new version never copies stale files out of the HTTP cache.
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()).catch(() => {}));
 });
 
 self.addEventListener("activate", e => {
@@ -21,9 +22,11 @@ self.addEventListener("fetch", e => {
   if (url.hostname.endsWith("supabase.co")) return;
 
   // HTML: network-first so app updates appear when online, cache fallback when offline.
+  // "no-cache" revalidates with the server instead of reusing the browser's HTTP cache
+  // (GitHub Pages lets that hold a page for 10 minutes).
   if (req.mode === "navigate") {
     e.respondWith(
-      fetch(req).then(res => { const c = res.clone(); caches.open(CACHE).then(k => k.put(req, c)).catch(() => {}); return res; })
+      fetch(req.url, { cache: "no-cache", credentials: "same-origin" }).then(res => { const c = res.clone(); caches.open(CACHE).then(k => k.put(req, c)).catch(() => {}); return res; })
         .catch(() => caches.match(req).then(h => h || caches.match("./index.html")))
     );
     return;
