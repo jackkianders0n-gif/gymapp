@@ -157,6 +157,7 @@ const fmtShortDate = d => {
   return dt.toLocaleDateString("en-GB", opts);
 };
 const newestFirst = (a, b) => new Date(b.date) - new Date(a.date);
+const fmtDay = d => new Date(d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
 // A logged exercise belongs to an exercise by id, or by name for older entries.
 const wexMatches = (ex, wex) => wex.exerciseId === ex.id || wex.name === ex.name;
@@ -601,7 +602,9 @@ function RestTimer() {
 
 // ─── Log Workout ───
 function LogWorkout({ exercises, workouts, onSave, onCancel, prefill, editing }) {
-  const [name, setName] = useState(prefill?.name || "");
+  // The name defaults to the workout's date; left as-is it's saved unnamed (cards show the date anyway).
+  const dateName = fmtDay(editing ? editing.date : new Date());
+  const [name, setName] = useState(prefill?.name || dateName);
   const [search, setSearch] = useState("");
   const [items, setItems] = useState(() => {
     if (prefill) return prefill.exercises.map(ex => ({ name: ex.name, exerciseId: ex.exerciseId, sets: ex.sets.map(s => ({ reps: String(s.reps), kg: String(s.kg), pos: s.pos || "" })) }));
@@ -734,7 +737,7 @@ function LogWorkout({ exercises, workouts, onSave, onCancel, prefill, editing })
         </div>
       )}
       <button onClick={() => {
-        const workout = { id: uid(), date: new Date().toISOString(), name: name.trim() || null, exercises: items.map(ex => ({ name: ex.name, exerciseId: ex.exerciseId, sets: ex.sets.filter(s => s.reps && s.kg).map(s => ({ reps: Number(s.reps), kg: Number(s.kg), ...(s.pos ? { pos: s.pos } : {}) })) })).filter(ex => ex.sets.length > 0) };
+        const workout = { id: uid(), date: new Date().toISOString(), name: name.trim() && name.trim() !== dateName ? name.trim() : null, exercises: items.map(ex => ({ name: ex.name, exerciseId: ex.exerciseId, sets: ex.sets.filter(s => s.reps && s.kg).map(s => ({ reps: Number(s.reps), kg: Number(s.kg), ...(s.pos ? { pos: s.pos } : {}) })) })).filter(ex => ex.sets.length > 0) };
         onSave(workout);
       }} disabled={!canSave}
         style={{ width: "100%", background: canSave ? "#3A9BE8" : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit", marginTop: 8 }}>
@@ -751,7 +754,7 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDele
   const [editingId, setEditingId] = useState(null);
   const [openId, setOpenId] = useState(null);
 
-  const fmt = d => new Date(d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const fmt = fmtDay;
   const ago = d => { const days = Math.floor((new Date() - new Date(d)) / 86400000); if (days === 0) return "Today"; if (days === 1) return "Yesterday"; return `${days}d ago`; };
   const recent4 = workouts.slice(0, 4);
 
