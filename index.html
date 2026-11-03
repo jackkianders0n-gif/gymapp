@@ -63,7 +63,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_bkeGnvruQEz3MsVDZiJ03g_bhXXDjgC";
 // ───────────────────────────────────────────────────────────
 
 // Shown next to the sync status; bump together with CACHE in sw.js on each deploy.
-const APP_VERSION = "v4";
+const APP_VERSION = "v5";
 
 const CONFIG_OK = !SUPABASE_URL.includes("PASTE") && !SUPABASE_ANON_KEY.includes("PASTE");
 const supa = CONFIG_OK ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -144,7 +144,10 @@ const SEED_JACK = [
   { id: "j33", name: "Russian Twists", area: "Abs", muscle: "Abs", pbs: [{ reps: 15, kg: 6 }] },
 ];
 
-const AREA_COLORS = { Legs: "#E8B931", Chest: "#E85D3A", Back: "#3A9BE8", Arms: "#B44AE8", Shoulders: "#3AE89B", Abs: "#E84A8A" };
+// App accent — change here to recolour buttons, active tab, links and selected states.
+const ACCENT = "#EC4899";
+const ACCENT_TEXT = "#F9A8D4"; // lighter accent for text links on dark backgrounds
+const AREA_COLORS = { Legs: "#E8B931", Chest: "#E85D3A", Back: "#3A9BE8", Arms: "#B44AE8", Shoulders: "#3AE89B", Abs: "#7B68EE" };
 const AREA_MUSCLES = { Legs: ["Quads", "Hamstrings", "Glutes", "Calves"], Chest: ["Chest"], Back: ["Lats", "Upper Back"], Arms: ["Biceps", "Triceps"], Shoulders: ["Delts"], Abs: ["Abs"] };
 const AREAS = Object.keys(AREA_MUSCLES);
 
@@ -172,6 +175,8 @@ const workoutVolume = (w, exercises) => w.exercises.reduce((t, wex) => {
   return t + wex.sets.reduce((u, s) => u + s.reps * s.kg * mult, 0);
 }, 0);
 const fmtVolume = v => `${Math.round(v).toLocaleString("en-GB")} kg`;
+// Distinct muscle groups in a session, in the order they were trained.
+const musclesWorked = (w, exercises) => [...new Set(w.exercises.map(wex => findExFor(exercises, wex)?.muscle).filter(Boolean))];
 
 // ─── PBs ───
 // exercise.pbs is the manual/seed baseline. Displayed PBs are the best of that baseline
@@ -219,7 +224,7 @@ const SearchBox = ({ value, onChange, placeholder }) => (
 // Custom checkbox — the global `input { appearance: none }` hides native ones.
 const CheckRow = ({ checked, onChange, label }) => (
   <button type="button" onClick={() => onChange(!checked)} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", padding: 0, marginBottom: 14, cursor: "pointer", fontFamily: "inherit" }}>
-    <span style={{ width: 18, height: 18, boxSizing: "border-box", borderRadius: 4, border: `1px solid ${checked ? "#3A9BE8" : "#3a3a40"}`, background: checked ? "#3A9BE8" : "#111", color: "#fff", fontSize: 12, lineHeight: "16px", textAlign: "center" }}>{checked ? "✓" : ""}</span>
+    <span style={{ width: 18, height: 18, boxSizing: "border-box", borderRadius: 4, border: `1px solid ${checked ? ACCENT : "#3a3a40"}`, background: checked ? ACCENT : "#111", color: "#fff", fontSize: 12, lineHeight: "16px", textAlign: "center" }}>{checked ? "✓" : ""}</span>
     <span style={{ color: "#aaa", fontSize: 12 }}>{label}</span>
   </button>
 );
@@ -293,9 +298,9 @@ function EmptyExercises({ status, onAdd, onLoadStarter }) {
     <div style={{ textAlign: "center", padding: "40px 12px" }}>
       <div style={{ color: "#eee", fontSize: 15, fontWeight: 600, marginBottom: 6 }}>No exercises yet</div>
       <div style={{ color: "#777", fontSize: 13, marginBottom: 16 }}>Add the exercises you do and their current PBs.</div>
-      <button onClick={onAdd} style={{ background: "#3A9BE8", border: "none", borderRadius: 8, padding: "10px 20px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>+ Add exercise</button>
+      <button onClick={onAdd} style={{ background: ACCENT, border: "none", borderRadius: 8, padding: "10px 20px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>+ Add exercise</button>
       {!picking ? (
-        <div><button onClick={() => setPicking(true)} style={{ background: "none", border: "none", color: "#8af", fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginTop: 14, textDecoration: "underline" }}>Load a starter set</button></div>
+        <div><button onClick={() => setPicking(true)} style={{ background: "none", border: "none", color: ACCENT_TEXT, fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginTop: 14, textDecoration: "underline" }}>Load a starter set</button></div>
       ) : (
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           {[{ key: "jakey", label: "Jakey", desc: "Barbell-based" }, { key: "jack", label: "Jack", desc: "Machine-based" }].map(o => (
@@ -329,7 +334,7 @@ function ExerciseHistory({ ex, workouts }) {
         </div>
       ))}
       {sessions.length > 5 && (
-        <button onClick={() => setShowAll(!showAll)} style={{ background: "none", border: "none", color: "#8af", fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: "6px 0 0" }}>
+        <button onClick={() => setShowAll(!showAll)} style={{ background: "none", border: "none", color: ACCENT_TEXT, fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: "6px 0 0" }}>
           {showAll ? "Show less" : `Show all ${sessions.length}`}
         </button>
       )}
@@ -337,8 +342,9 @@ function ExerciseHistory({ ex, workouts }) {
   );
 }
 
-// ─── PB Tab ───
-function PBTab({ exercises, workouts, onUpdate, onDelete, emptyStatus, onAddClick, onLoadStarter }) {
+// ─── Exercises Tab ───
+// Search/filter, add/edit/remove, and tap an exercise for its history.
+function ExercisesTab({ exercises, workouts, onUpdate, onDelete, emptyStatus, onAddClick, onLoadStarter }) {
   const [search, setSearch] = useState("");
   const [area, setArea] = useState("All");
   const [muscle, setMuscle] = useState("All");
@@ -352,7 +358,6 @@ function PBTab({ exercises, workouts, onUpdate, onDelete, emptyStatus, onAddClic
     if (muscle !== "All" && ex.muscle !== muscle) return false;
     return true;
   });
-  const target = kg => kg + (kg >= 50 ? 2.5 : kg >= 20 ? 1.25 : 0.5);
 
   if (exercises.length === 0) return <EmptyExercises status={emptyStatus} onAdd={onAddClick} onLoadStarter={onLoadStarter} />;
 
@@ -361,7 +366,7 @@ function PBTab({ exercises, workouts, onUpdate, onDelete, emptyStatus, onAddClic
       <SearchBox value={search} onChange={setSearch} placeholder="Search exercises..." />
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
         {["All", ...AREAS].map(a => {
-          const active = area === a; const col = a === "All" ? "#888" : AREA_COLORS[a];
+          const active = area === a; const col = a === "All" ? ACCENT : AREA_COLORS[a];
           return <button key={a} onClick={() => { setArea(a); setMuscle("All"); }} style={{ ...pillBase, ...(active ? pillActive(col) : pillInactive) }}>{a}</button>;
         })}
       </div>
@@ -384,33 +389,15 @@ function PBTab({ exercises, workouts, onUpdate, onDelete, emptyStatus, onAddClic
               <div style={{ flex: 1 }}>
                 <div style={{ color: "#eee", fontSize: 14, fontWeight: 600 }}>{ex.name}</div>
                 <div style={{ color: "#666", fontSize: 11, marginTop: 2 }}>{ex.muscle}</div>
+                {ex.pbs.length > 0 && <div style={{ color: "#777", fontSize: 10, marginTop: 3 }}>Best: {ex.pbs.map(p => fmtSet(ex, p.reps, p.kg)).join(" · ")}</div>}
               </div>
               <div style={{ color: "#555", fontSize: 18, marginLeft: 8, transition: "transform 0.2s", transform: isOpen ? "rotate(180deg)" : "none" }}>⌄</div>
             </button>
-            <div style={{ padding: "0 14px 10px", display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {[...ex.pbs].sort((a, b) => b.reps - a.reps).map(p => (
-                <div key={p.reps} style={{ background: "#111", borderRadius: 6, padding: "5px 10px", textAlign: "center" }}>
-                  <div style={{ color: "#999", fontSize: 10 }}>{p.reps} rep{p.reps > 1 ? "s" : ""}</div>
-                  <div style={{ color: "#eee", fontSize: 15, fontWeight: 700 }}>{ex.perHand && <span style={{ color: "#666", fontSize: 11, fontWeight: 400 }}>2×</span>}{p.kg}<span style={{ color: "#666", fontSize: 11, fontWeight: 400 }}>kg</span></div>
-                </div>
-              ))}
-            </div>
             {isOpen && (
               <div style={{ padding: "0 14px 14px" }}>
-                <div style={{ background: "#111113", borderRadius: 8, padding: 10, marginBottom: 10 }}>
-                  <div style={{ color: "#777", fontSize: 10, fontWeight: 600, marginBottom: 6, letterSpacing: "0.03em" }}>Targets to beat</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {[...ex.pbs].sort((a, b) => b.reps - a.reps).map(p => (
-                      <div key={p.reps} style={{ background: `${col}12`, border: `1px solid ${col}30`, borderRadius: 6, padding: "5px 10px", textAlign: "center", minWidth: 56 }}>
-                        <div style={{ color: "#aaa", fontSize: 10 }}>{p.reps} reps</div>
-                        <div style={{ color: col, fontSize: 14, fontWeight: 700 }}>{fmtKg(ex, target(p.kg))}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
                 <ExerciseHistory ex={ex} workouts={workouts} />
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setEditing(ex.id)} style={{ flex: 1, background: "#131518", border: "1px solid #252830", borderRadius: 6, padding: "7px", color: "#8af", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
+                  <button onClick={() => setEditing(ex.id)} style={{ flex: 1, background: "#131518", border: "1px solid #252830", borderRadius: 6, padding: "7px", color: ACCENT_TEXT, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
                   <button onClick={() => { onDelete(ex.id); setExpanded(null); }} style={{ flex: 1, background: "#1c1215", border: "1px solid #3a1a1a", borderRadius: 6, padding: "7px", color: "#c44", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
                 </div>
               </div>
@@ -473,7 +460,7 @@ function EditExerciseSheet({ exercise, onSave, onClose }) {
         const out = { ...raw, name: name.trim(), area, muscle, pbs: cleaned };
         if (perHand) out.perHand = true; else delete out.perHand;
         onSave(out);
-      }} style={{ width: "100%", background: canSave ? "#3A9BE8" : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit" }}>Save changes</button>
+      }} style={{ width: "100%", background: canSave ? ACCENT : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit" }}>Save changes</button>
     </Sheet>
   );
 }
@@ -514,7 +501,7 @@ function AddExerciseSheet({ onAdd, onClose, existingNames }) {
       <button disabled={!canSave} onClick={() => {
         const cleaned = pbs.filter(r => r.reps && r.kg).map(r => ({ reps: Number(r.reps), kg: Number(r.kg) }));
         onAdd({ id: uid(), name: name.trim(), area, muscle, pbs: cleaned, ...(perHand ? { perHand: true } : {}) });
-      }} style={{ width: "100%", background: canSave ? "#3A9BE8" : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit" }}>Save exercise</button>
+      }} style={{ width: "100%", background: canSave ? ACCENT : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit" }}>Save exercise</button>
     </Sheet>
   );
 }
@@ -596,7 +583,7 @@ function RestTimer() {
               <button onClick={() => setRun(null)} style={{ ...smallBtn, padding: "4px 10px" }}>×</button>
             </div>
           )}
-          {run && <div style={{ position: "absolute", left: 0, bottom: 0, height: 3, width: `${pct}%`, background: "#3A9BE8" }} />}
+          {run && <div style={{ position: "absolute", left: 0, bottom: 0, height: 3, width: `${pct}%`, background: ACCENT }} />}
         </div>
       )}
     </>
@@ -734,7 +721,7 @@ function LogWorkout({ exercises, workouts, onSave, onCancel, prefill, editing })
             <button key={ex.name} onClick={() => addEx(ex)}
               style={{ width: "100%", background: "none", border: "none", borderBottom: "1px solid #1a1a1e", padding: "10px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div><div style={{ color: "#ddd", fontSize: 13 }}>{ex.name}</div><div style={{ color: "#555", fontSize: 10 }}>{ex.area} · {ex.muscle}</div></div>
-              <span style={{ color: "#3A9BE8", fontSize: 18 }}>+</span>
+              <span style={{ color: ACCENT, fontSize: 18 }}>+</span>
             </button>
           ))}
         </div>
@@ -743,7 +730,7 @@ function LogWorkout({ exercises, workouts, onSave, onCancel, prefill, editing })
         const workout = { id: uid(), date: new Date().toISOString(), name: name.trim() && name.trim() !== dateName ? name.trim() : null, exercises: items.map(ex => ({ name: ex.name, exerciseId: ex.exerciseId, sets: ex.sets.filter(s => s.reps && s.kg).map(s => ({ reps: Number(s.reps), kg: Number(s.kg), ...(s.pos ? { pos: s.pos } : {}) })) })).filter(ex => ex.sets.length > 0) };
         onSave(workout);
       }} disabled={!canSave}
-        style={{ width: "100%", background: canSave ? "#3A9BE8" : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit", marginTop: 8 }}>
+        style={{ width: "100%", background: canSave ? ACCENT : "#222", border: "none", borderRadius: 8, padding: "12px", color: canSave ? "#fff" : "#555", fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default", fontFamily: "inherit", marginTop: 8 }}>
         {editing ? "Save changes" : "Save workout"}
       </button>
     </div>
@@ -751,7 +738,7 @@ function LogWorkout({ exercises, workouts, onSave, onCancel, prefill, editing })
 }
 
 // ─── Workouts Tab ───
-function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDeleteWorkout }) {
+function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDeleteWorkout, emptyStatus, onAddClick, onLoadStarter }) {
   const [logging, setLogging] = useState(false);
   const [prefill, setPrefill] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -769,10 +756,13 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDele
       onCancel={closeLog} />;
   }
 
+  // Brand-new account: nothing to log yet, so offer the same start as the Exercises tab.
+  if (exercises.length === 0 && workouts.length === 0) return <EmptyExercises status={emptyStatus} onAdd={onAddClick} onLoadStarter={onLoadStarter} />;
+
   return (
     <div>
       <button onClick={() => setLogging(true)}
-        style={{ width: "100%", background: "#3A9BE8", border: "none", borderRadius: 8, padding: "12px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}>
+        style={{ width: "100%", background: ACCENT, border: "none", borderRadius: 8, padding: "12px", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}>
         Log workout
       </button>
 
@@ -798,8 +788,8 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDele
           <button onClick={() => setOpenId(openId === w.id ? null : w.id)}
             style={{ width: "100%", background: "none", border: "none", padding: "12px 14px", cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ color: "#eee", fontSize: 14, fontWeight: 600 }}>{w.name || fmt(w.date)}</div>
-              <div style={{ color: "#666", fontSize: 11 }}>{w.name ? `${fmt(w.date)} · ` : ""}{w.exercises.map(e => e.name).join(", ").slice(0, 50)}{w.exercises.map(e => e.name).join(", ").length > 50 ? "…" : ""}</div>
+              <div style={{ color: "#eee", fontSize: 14, fontWeight: 600 }}>{fmt(w.date)}</div>
+              <div style={{ color: "#666", fontSize: 11 }}>{musclesWorked(w, exercises).join(" · ")}</div>
             </div>
             <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
               <div style={{ color: "#888", fontSize: 12 }}>{ago(w.date)}</div>
@@ -809,6 +799,7 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDele
           </button>
           {openId === w.id && (
             <div style={{ padding: "0 14px 14px" }}>
+              {w.name && <div style={{ color: "#ccc", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{w.name}</div>}
               <div style={{ color: "#999", fontSize: 12, marginBottom: 6 }}>Volume: <span style={{ color: "#eee", fontWeight: 600 }}>{fmtVolume(workoutVolume(w, exercises))}</span></div>
               {w.exercises.map((ex, i) => {
                 const exData = findExFor(exercises, ex);
@@ -823,7 +814,7 @@ function WorkoutsTab({ exercises, workouts, onSaveWorkout, onEditWorkout, onDele
               })}
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                 <button onClick={() => { setPrefill(w); setEditingId(w.id); setLogging(true); }}
-                  style={{ flex: 1, background: "#131518", border: "1px solid #252830", borderRadius: 6, padding: "7px", color: "#8af", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                  style={{ flex: 1, background: "#131518", border: "1px solid #252830", borderRadius: 6, padding: "7px", color: ACCENT_TEXT, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
                   Edit workout
                 </button>
                 <button onClick={() => onDeleteWorkout(w.id)}
@@ -846,7 +837,7 @@ function ProgressTab({ exercises, workouts }) {
   // Default to the first exercise, including once a new account adds or loads some.
   const selected = exercises.some(e => e.name === picked) ? picked : (exercises[0]?.name || "");
   const ex = exercises.find(e => e.name === selected);
-  const col = ex ? AREA_COLORS[ex.area] : "#888";
+  const col = ex ? AREA_COLORS[ex.area] || ACCENT : ACCENT;
   const searchResults = exercises.filter(e => e.name.toLowerCase().includes(searchP.toLowerCase()));
 
   // Build real chart data from workouts
@@ -976,12 +967,12 @@ function Celebration({ pbs, onDone }) {
 }
 
 // ─── App ───
-const TABS = ["PBs", "Workouts", "Progress"];
+const TABS = ["Workouts", "Exercises", "Progress"];
 
 function MainApp({ onSignOut }) {
   const [exercises, setExercises] = useState([]);
   const [workouts, setWorkouts] = useState([]);
-  const [tab, setTab] = useState("PBs");
+  const [tab, setTab] = useState("Workouts");
   const [showAdd, setShowAdd] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [celebration, setCelebration] = useState(null); // array of beaten PBs
@@ -1123,19 +1114,20 @@ function MainApp({ onSignOut }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => setShowAdd(true)} style={{ background: "#3A9BE8", border: "none", borderRadius: 8, padding: "7px 14px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>+ Add</button>
+          <button onClick={() => setShowAdd(true)} style={{ background: ACCENT, border: "none", borderRadius: 8, padding: "7px 14px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>+ Add</button>
           <button onClick={onSignOut} title="Sign out" style={{ background: "none", border: "1px solid #2a2a2e", borderRadius: 8, padding: "7px 10px", color: "#888", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Sign out</button>
         </div>
       </div>
       <div style={{ display: "flex", padding: "12px 16px 0", borderBottom: "1px solid #1a1a1e" }}>
-        {TABS.map(t => <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: "none", border: "none", borderBottom: tab === t ? "2px solid #eee" : "2px solid transparent", padding: "8px 0 10px", color: tab === t ? "#eee" : "#555", fontSize: 13, fontWeight: tab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{t}</button>)}
+        {TABS.map(t => <button key={t} onClick={() => setTab(t)} style={{ flex: 1, background: "none", border: "none", borderBottom: tab === t ? `2px solid ${ACCENT}` : "2px solid transparent", padding: "8px 0 10px", color: tab === t ? ACCENT : "#555", fontSize: 13, fontWeight: tab === t ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{t}</button>)}
       </div>
       <div style={{ padding: "14px 16px 100px" }}>
-        <div style={{ display: tab === "PBs" ? "block" : "none" }}>
-          <PBTab exercises={shown} workouts={workouts} onUpdate={handleUpdate} onDelete={handleDelete} emptyStatus={emptyStatus} onAddClick={() => setShowAdd(true)} onLoadStarter={handleLoadStarter} />
-        </div>
         <div style={{ display: tab === "Workouts" ? "block" : "none" }}>
-          <WorkoutsTab exercises={shown} workouts={workouts} onSaveWorkout={handleSaveWorkout} onEditWorkout={handleEditWorkout} onDeleteWorkout={handleDeleteWorkout} />
+          <WorkoutsTab exercises={shown} workouts={workouts} onSaveWorkout={handleSaveWorkout} onEditWorkout={handleEditWorkout} onDeleteWorkout={handleDeleteWorkout}
+            emptyStatus={emptyStatus} onAddClick={() => setShowAdd(true)} onLoadStarter={handleLoadStarter} />
+        </div>
+        <div style={{ display: tab === "Exercises" ? "block" : "none" }}>
+          <ExercisesTab exercises={shown} workouts={workouts} onUpdate={handleUpdate} onDelete={handleDelete} emptyStatus={emptyStatus} onAddClick={() => setShowAdd(true)} onLoadStarter={handleLoadStarter} />
         </div>
         <div style={{ display: tab === "Progress" ? "block" : "none" }}>
           <ProgressTab exercises={shown} workouts={workouts} />
@@ -1190,7 +1182,7 @@ function AuthGate({ onAuth }) {
       {err && <div style={{ color: "#e5606a", fontSize: 13, marginBottom: 10 }}>{err}</div>}
       {msg && <div style={{ color: "#3AE89B", fontSize: 13, marginBottom: 10 }}>{msg}</div>}
       <button onClick={submit} disabled={busy}
-        style={{ width: "100%", background: busy ? "#245" : "#3A9BE8", border: "none", borderRadius: 8, padding: "13px", color: "#fff", fontSize: 15, fontWeight: 600, cursor: busy ? "default" : "pointer", fontFamily: "inherit" }}>
+        style={{ width: "100%", background: busy ? "#6b2148" : ACCENT, border: "none", borderRadius: 8, padding: "13px", color: "#fff", fontSize: 15, fontWeight: 600, cursor: busy ? "default" : "pointer", fontFamily: "inherit" }}>
         {busy ? "Please wait…" : (mode === "signup" ? "Create account" : "Sign in")}
       </button>
       <button onClick={() => { setMode(mode === "signup" ? "signin" : "signup"); setErr(""); setMsg(""); }}
