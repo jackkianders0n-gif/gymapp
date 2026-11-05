@@ -63,7 +63,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_bkeGnvruQEz3MsVDZiJ03g_bhXXDjgC";
 // ───────────────────────────────────────────────────────────
 
 // Shown next to the sync status; bump together with CACHE in sw.js on each deploy.
-const APP_VERSION = "v5";
+const APP_VERSION = "v6";
 
 const CONFIG_OK = !SUPABASE_URL.includes("PASTE") && !SUPABASE_ANON_KEY.includes("PASTE");
 const supa = CONFIG_OK ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -472,12 +472,15 @@ function AddExerciseSheet({ onAdd, onClose, existingNames }) {
   const [muscle, setMuscle] = useState("Quads");
   const [perHand, setPerHand] = useState(false);
   const [pbs, setPbs] = useState([{ reps: "", kg: "" }]);
-  const canSave = name.trim() && !existingNames.includes(name.trim());
+  // Names must be unique (logged workouts match exercises by name), ignoring case.
+  const dup = name.trim() && existingNames.find(n => n.toLowerCase() === name.trim().toLowerCase());
+  const canSave = name.trim() && !dup;
 
   return (
     <Sheet title="Add exercise" onClose={onClose}>
       <label style={{ color: "#888", fontSize: 11, display: "block", marginBottom: 4 }}>Name</label>
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Leg Press" style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: 12 }} />
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Leg Press" style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginBottom: dup ? 6 : 12 }} />
+      {dup && <div style={{ color: "#e5606a", fontSize: 12, marginBottom: 12 }}>You already have “{dup}” — find it in the Exercises tab, or pick another name.</div>}
       <label style={{ color: "#888", fontSize: 11, display: "block", marginBottom: 4 }}>Body area</label>
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
         {AREAS.map(a => <button key={a} onClick={() => { setArea(a); setMuscle(AREA_MUSCLES[a][0]); }} style={{ ...pillBase, ...(area === a ? pillActive(AREA_COLORS[a]) : { ...pillInactive, background: "#111" }) }}>{a}</button>)}
