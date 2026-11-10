@@ -63,7 +63,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_bkeGnvruQEz3MsVDZiJ03g_bhXXDjgC";
 // ───────────────────────────────────────────────────────────
 
 // Shown next to the sync status; bump together with CACHE in sw.js on each deploy.
-const APP_VERSION = "v7";
+const APP_VERSION = "v8";
 
 const CONFIG_OK = !SUPABASE_URL.includes("PASTE") && !SUPABASE_ANON_KEY.includes("PASTE");
 const supa = CONFIG_OK ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
