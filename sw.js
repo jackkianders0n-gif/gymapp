@@ -1,5 +1,5 @@
 // Gym Tracker service worker — offline app shell
-const CACHE = "gymtracker-v7"; // keep in step with APP_VERSION in index.html
+const CACHE = "gymtracker-v8"; // keep in step with APP_VERSION in index.html
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
